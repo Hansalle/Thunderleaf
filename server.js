@@ -80,6 +80,13 @@ app.get("/tv/:tmdb/:season/:episode", async (req, res) => {
     res.status(500).json({ error: "scrape failed" });
   }
 });
+app.get("/", async (req, res) => {
+  res.status(200).json({ status: `Running on port 3000 using ${process.version}v` });
+});
+
+app.get("*", async (req, res) => {
+  res.json({ error: `Feeling a little bit lost? Maybe you shouldn't access this API` });
+});
 
 app.listen(3000, () => {
   console.log("scraper running on port 3000");
