@@ -11,8 +11,6 @@ const PORT = 3000;
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36";
 
-/* GLOBAL ERROR LOGGING */
-
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err);
 });
@@ -20,8 +18,6 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (err) => {
   console.error("UNHANDLED REJECTION:", err);
 });
-
-/* SCRAPER */
 
 async function scrapeStream(type, tmdb, season, episode) {
   const pageUrl =
@@ -45,8 +41,6 @@ async function scrapeStream(type, tmdb, season, episode) {
     resolveStream = resolve;
   });
 
-  /* PAGE DEBUG */
-
   page.on("console", (msg) => {
     console.log("PAGE LOG:", msg.text());
   });
@@ -58,8 +52,6 @@ async function scrapeStream(type, tmdb, season, episode) {
   page.on("requestfailed", (req) => {
     console.error("REQUEST FAILED:", req.url(), req.failure()?.errorText);
   });
-
-  /* NETWORK INTERCEPT */
 
   page.on("request", (req) => {
     const url = req.url();
@@ -89,10 +81,8 @@ async function scrapeStream(type, tmdb, season, episode) {
 
   await page.goto(pageUrl, {
     waitUntil: "networkidle2",
-    timeout: 60000,
+    timeout: 30000,
   });
-
-  /* wait max 15 seconds */
 
   let stream;
 
@@ -117,8 +107,6 @@ async function scrapeStream(type, tmdb, season, episode) {
 
   return stream;
 }
-
-/* ROUTES */
 
 app.get("/movie/:tmdb", async (req, res) => {
   try {
@@ -162,16 +150,12 @@ app.get("/tv/:tmdb/:season/:episode", async (req, res) => {
   }
 });
 
-/* HEALTH */
-
 app.get("/", (req, res) => {
   res.json({
     status: "Thunderleaf scraper running",
     node: process.version,
   });
 });
-
-/* UNKNOWN ROUTE */
 
 app.use((req, res) => {
   console.warn("UNKNOWN ROUTE:", req.method, req.url);
@@ -181,7 +165,6 @@ app.use((req, res) => {
   });
 });
 
-/* START */
 
 app.listen(PORT, () => {
   console.log(`Thunderleaf scraper running on port ${PORT}`);
