@@ -67,5 +67,13 @@ app.get("/tv/:tmdb/:season/:episode", async (c) => {
   }
 });
 
-app.get("/", (c) => c.json({ status: `Cloudflare Scraper Running (v${process.versions} | ${process.cpuUsage} | ${process.uptime}` }));
+app.get("/", (c) => {
+  return c.json({ 
+    status: "Thunderleaf Running",
+    info: {
+      node_version: typeof process !== 'undefined' ? process.version : "workerd",
+      timestamp: new Date().toISOString()
+    }
+  });
+});
 export default app
