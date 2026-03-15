@@ -1,171 +1,72 @@
-const express = require("express");
-const puppeteer = require("puppeteer");
-const cors = require("cors");
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import puppeteer from '@cloudflare/puppeteer';
 
-const app = express();
+const app = new Hono();
 
-app.use(cors());
+app.use('*', cors());
 
-const PORT = 3000;
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36";
 
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36";
+async function scrapeStream(c, type, tmdb, season, episode) {
+  const pageUrl = type === "movie"
+    ? `https://vidlink.pro/movie/${tmdb}`
+    : `https://vidlink.pro/tv/${tmdb}/${season}/${episode}`;
 
-process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT EXCEPTION:", err);
-});
-
-process.on("unhandledRejection", (err) => {
-  console.error("UNHANDLED REJECTION:", err);
-});
-
-async function scrapeStream(type, tmdb, season, episode) {
-  const pageUrl =
-    type === "movie"
-      ? `https://vidlink.pro/movie/${tmdb}`
-      : `https://vidlink.pro/tv/${tmdb}/${season}/${episode}`;
-
-  console.log("Opening:", pageUrl);
-
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-
+  const browser = await puppeteer.launch(c.env.MYBROWSER); 
   const page = await browser.newPage();
-
   await page.setUserAgent(UA);
 
-  let resolveStream;
-  const streamPromise = new Promise((resolve) => {
-    resolveStream = resolve;
-  });
+  let finalStream = null;
 
-  page.on("console", (msg) => {
-    console.log("PAGE LOG:", msg.text());
-  });
-
-  page.on("pageerror", (err) => {
-    console.error("PAGE ERROR:", err);
-  });
-
-  page.on("requestfailed", (req) => {
-    console.error("REQUEST FAILED:", req.url(), req.failure()?.errorText);
-  });
-
-  page.on("request", (req) => {
-    const url = req.url();
-
-    if (url.includes("videostr")) {
-      console.log("VIDEOSTR REQUEST:", url);
-    }
-
-    if (url.includes(".m3u8")) {
-      console.log("M3U8 REQUEST:", url);
-
-      if (!url.includes("playlist")) {
-        console.log("FINAL STREAM FOUND:", url);
-        resolveStream(url);
-      }
-    }
-  });
-
-  page.on("response", (res) => {
-    const url = res.url();
-
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    const url = request.url();
     if (url.includes(".m3u8") && !url.includes("playlist")) {
-      console.log("M3U8 RESPONSE:", url);
-      resolveStream(url);
+      finalStream = url;
     }
+    request.continue();
   });
-
-  await page.goto(pageUrl, {
-    waitUntil: "networkidle2",
-    timeout: 30000,
-  });
-
-  let stream;
 
   try {
-    stream = await Promise.race([
-      streamPromise,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Stream timeout")), 15000)
-      ),
-    ]);
-  } catch (err) {
-    console.error("STREAM ERROR:", err);
+    await page.goto(pageUrl, {
+      waitUntil: "networkidle2",
+      timeout: 20000,
+    });
+
+    let attempts = 0;
+    while (!finalStream && attempts < 10) {
+      await new Promise(r => setTimeout(r, 1000));
+      attempts++;
+    }
+  } finally {
+    await browser.close();
   }
 
-  await browser.close();
-
-  if (!stream) {
-    throw new Error("Stream not found");
-  }
-
-  console.log("STREAM CAPTURED:", stream);
-
-  return stream;
+  if (!finalStream) throw new Error("Stream not found");
+  return finalStream;
 }
 
-app.get("/movie/:tmdb", async (req, res) => {
+app.get("/movie/:tmdb", async (c) => {
+  const tmdb = c.req.param('tmdb');
   try {
-    console.log("MOVIE REQUEST:", req.params.tmdb);
-
-    const stream = await scrapeStream("movie", req.params.tmdb);
-
-    res.json({
-      stream,
-      type: "hls",
-    });
+    const stream = await scrapeStream(c, "movie", tmdb);
+    return c.json({ stream, type: "hls" });
   } catch (err) {
-    console.error("MOVIE ROUTE ERROR:", err);
-
-    res.status(500).json({
-      error: "scrape failed",
-      message: err.message,
-    });
+    return c.json({ error: "scrape failed", message: err.message }, 500);
   }
 });
 
-app.get("/tv/:tmdb/:season/:episode", async (req, res) => {
+app.get("/tv/:tmdb/:season/:episode", async (c) => {
+  const { tmdb, season, episode } = c.req.param();
   try {
-    const { tmdb, season, episode } = req.params;
-
-    console.log("TV REQUEST:", tmdb, season, episode);
-
-    const stream = await scrapeStream("tv", tmdb, season, episode);
-
-    res.json({
-      stream,
-      type: "hls",
-    });
+    const stream = await scrapeStream(c, "tv", tmdb, season, episode);
+    return c.json({ stream, type: "hls" });
   } catch (err) {
-    console.error("TV ROUTE ERROR:", err);
-
-    res.status(500).json({
-      error: "scrape failed",
-      message: err.message,
-    });
+    return c.json({ error: "scrape failed", message: err.message }, 500);
   }
 });
 
-app.get("/", (req, res) => {
-  res.json({
-    status: "Thunderleaf scraper running",
-    node: process.version,
-  });
-});
+app.get("/", (c) => c.json({ status: "Cloudflare Scraper Running" }));
 
-app.use((req, res) => {
-  console.warn("UNKNOWN ROUTE:", req.method, req.url);
-
-  res.status(404).json({
-    error: "Unknown endpoint",
-  });
-});
-
-
-app.listen(PORT, () => {
-  console.log(`Thunderleaf scraper running on port ${PORT}`);
-});
+export default app;

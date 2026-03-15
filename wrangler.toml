@@ -1,0 +1,8 @@
+name = "thunderleaf-scraper"
+main = "src/index.js"
+compatibility_date = "2024-03-15"
+
+browser = { binding = "MYBROWSER" }
+
+[observability]
+enabled = true
