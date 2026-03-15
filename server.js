@@ -1,6 +1,6 @@
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import puppeteer from '@cloudflare/puppeteer';
+const { Hono } = require('hono');
+const { cors } = require('hono/cors');
+const { puppeteer } = require('@cloudflare/puppeteer');
 
 const app = new Hono();
 
