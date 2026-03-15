@@ -1,6 +1,6 @@
-const { Hono } = require('hono');
-const { cors } = require('hono/cors');
-const { puppeteer } = require('@cloudflare/puppeteer');
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import puppeteer from '@cloudflare/puppeteer';
 
 const app = new Hono();
 
@@ -68,4 +68,4 @@ app.get("/tv/:tmdb/:season/:episode", async (c) => {
 });
 
 app.get("/", (c) => c.json({ status: `Cloudflare Scraper Running (v${process.versions} | ${process.cpuUsage} | ${process.uptime}` }));
-module.exports = app;
+export default app
