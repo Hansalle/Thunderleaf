@@ -13,37 +13,50 @@ async function scrapeStream(c, type, tmdb, season, episode) {
     ? `https://vidlink.pro/movie/${tmdb}`
     : `https://vidlink.pro/tv/${tmdb}/${season}/${episode}`;
 
-  const browser = await puppeteer.launch(c.env.MYBROWSER); 
+  const browser = await puppeteer.launch(c.env.MYBROWSER);
   const page = await browser.newPage();
+
   await page.setUserAgent(UA);
 
   let finalStream = null;
 
   await page.setRequestInterception(true);
-  page.on('request', (request) => {
-    const url = request.url();
+
+  page.on("request", (req) => {
+    const url = req.url();
+
     if (url.includes(".m3u8") && !url.includes("playlist")) {
       finalStream = url;
     }
-    request.continue();
+
+    req.continue();
   });
 
   try {
-    await page.goto(pageUrl, {
-      waitUntil: "networkidle2",
-      timeout: 20000,
-    });
+    try {
+      await page.goto(pageUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 10000
+      });
+    } catch (e) {
+      if (!e.message.includes("frame was detached")) throw e;
+    }
+
+    await page.waitForSelector("iframe", { timeout: 10000 }).catch(() => {});
 
     let attempts = 0;
-    while (!finalStream && attempts < 10) {
+
+    while (!finalStream && attempts < 15) {
       await new Promise(r => setTimeout(r, 1000));
       attempts++;
     }
+
   } finally {
     await browser.close();
   }
 
   if (!finalStream) throw new Error("Stream not found");
+
   return finalStream;
 }
 
