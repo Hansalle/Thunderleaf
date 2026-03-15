@@ -68,5 +68,4 @@ app.get("/tv/:tmdb/:season/:episode", async (c) => {
 });
 
 app.get("/", (c) => c.json({ status: "Cloudflare Scraper Running" }));
-
-export default app;
+module.exports = app;
