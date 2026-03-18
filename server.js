@@ -12,7 +12,7 @@ async function scrapeStream(c, type, tmdb, season, episode) {
     ? `https://vidlink.pro/movie/${tmdb}`
     : `https://vidlink.pro/tv/${tmdb}/${season}/${episode}`;
 
-  const browser = await c.env.MYBROWSER.launch();
+  const browser = await c.env.MYBROWSER;
   const page = await browser.newPage();
 
   await page.setUserAgent(UA);
