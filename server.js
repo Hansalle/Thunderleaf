@@ -1,13 +1,22 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import type { Env } from './env';
 
-const app = new Hono();
+const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', cors());
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-async function scrapeStream(c, type, tmdb, season, episode) {
+type MediaType = 'movie' | 'tv';
+
+async function scrapeStream(
+  c: Parameters<typeof app.get>[0][0], 
+  type: MediaType, 
+  tmdb: string, 
+  season?: string, 
+  episode?: string
+): Promise<string> {
   const pageUrl = type === "movie"
     ? `https://vidlink.pro/movie/${tmdb}`
     : `https://vidlink.pro/tv/${tmdb}/${season}/${episode}`;
@@ -17,15 +26,15 @@ async function scrapeStream(c, type, tmdb, season, episode) {
 
   await page.setUserAgent(UA);
 
-  let finalStream = null;
+  let finalStream: string | null = null;
 
   await page.setRequestInterception(true);
 
-  page.on("request", (req) => {
+  page.on("request", (req: any) => {
     const url = req.url();
-    const type = req.resourceType();
+    const resourceType = req.resourceType();
 
-    if (["image", "stylesheet", "font", "js"].includes(type)) {
+    if (["image", "stylesheet", "font", "script"].includes(resourceType)) {
       return req.abort();
     }
 
@@ -44,12 +53,11 @@ async function scrapeStream(c, type, tmdb, season, episode) {
 
     let attempts = 0;
     while (!finalStream && attempts < 10) {
-      if (finalStream) break;
       await new Promise(r => setTimeout(r, 800));
       attempts++;
     }
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("Scrape Error:", err.message);
   } finally {
     await browser.close();
@@ -71,7 +79,7 @@ app.get("/movie/:tmdb", async (c) => {
       type: "hls", 
       latency: `${Date.now() - start}ms` 
     });
-  } catch (err) {
+  } catch (err: any) {
     return c.json({ success: false, error: err.message, latency: `${Date.now() - start}ms` }, 500);
   }
 });
@@ -87,7 +95,7 @@ app.get("/tv/:tmdb/:season/:episode", async (c) => {
       type: "hls", 
       latency: `${Date.now() - start}ms` 
     });
-  } catch (err) {
+  } catch (err: any) {
     return c.json({ success: false, error: err.message, latency: `${Date.now() - start}ms` }, 500);
   }
 });
