@@ -25,7 +25,7 @@ async function scrapeStream(c, type, tmdb, season, episode) {
     const url = req.url();
     const type = req.resourceType();
 
-    if (["image", "stylesheet", "font", ""].includes(type)) {
+    if (["image", "stylesheet", "font", "js"].includes(type)) {
       return req.abort();
     }
 
