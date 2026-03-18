@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import puppeteer from '@cloudflare/puppeteer';
 
 const app = new Hono();
 
@@ -13,7 +12,7 @@ async function scrapeStream(c, type, tmdb, season, episode) {
     ? `https://vidlink.pro/movie/${tmdb}`
     : `https://vidlink.pro/tv/${tmdb}/${season}/${episode}`;
 
-  const browser = await puppeteer.launch(c.env.MYBROWSER);
+  const browser = await c.env.MYBROWSER.launch();
   const page = await browser.newPage();
 
   await page.setUserAgent(UA);
@@ -24,11 +23,9 @@ async function scrapeStream(c, type, tmdb, season, episode) {
 
   page.on("request", (req) => {
     const url = req.url();
-
     if (url.includes(".m3u8") && !url.includes("playlist")) {
       finalStream = url;
     }
-
     req.continue();
   });
 
@@ -45,7 +42,6 @@ async function scrapeStream(c, type, tmdb, season, episode) {
     await page.waitForSelector("iframe", { timeout: 10000 }).catch(() => {});
 
     let attempts = 0;
-
     while (!finalStream && attempts < 15) {
       await new Promise(r => setTimeout(r, 1000));
       attempts++;
@@ -56,25 +52,38 @@ async function scrapeStream(c, type, tmdb, season, episode) {
   }
 
   if (!finalStream) throw new Error("Stream not found");
-
   return finalStream;
 }
 
 app.get("/movie/:tmdb", async (c) => {
+  const startTime = Date.now();
   const tmdb = c.req.param('tmdb');
   try {
     const stream = await scrapeStream(c, "movie", tmdb);
-    return c.json({ stream, type: "hls" });
+    const latency = Date.now() - startTime;
+    
+    return c.json({ 
+      stream, 
+      type: "hls", 
+      latency: `${latency}ms` 
+    });
   } catch (err) {
     return c.json({ error: "scrape failed", message: err.message }, 500);
   }
 });
 
 app.get("/tv/:tmdb/:season/:episode", async (c) => {
+  const startTime = Date.now()
   const { tmdb, season, episode } = c.req.param();
   try {
     const stream = await scrapeStream(c, "tv", tmdb, season, episode);
-    return c.json({ stream, type: "hls" });
+    const latency = Date.now() - startTime;
+
+    return c.json({ 
+      stream, 
+      type: "hls", 
+      latency: `${latency}ms` 
+    });
   } catch (err) {
     return c.json({ error: "scrape failed", message: err.message }, 500);
   }
@@ -89,4 +98,5 @@ app.get("/", (c) => {
     }
   });
 });
-export default app
+
+export default app;
